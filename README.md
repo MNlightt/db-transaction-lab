@@ -5,6 +5,7 @@
 | 실험 | 문서 | 재현 SQL |
 |---|---|---|
 | Lost update 재현과 해결 (MySQL 8.4 InnoDB, REPEATABLE READ) | [lost-update.md](lost-update.md) | [sql/lost-update.sql](sql/lost-update.sql) |
+| 접근 순서 데드락 재현과 해결 (MySQL 8.4 InnoDB, REPEATABLE READ) | [deadlock.md](deadlock.md) | [sql/deadlock.sql](sql/deadlock.sql) |
 
 ## Lost update 실험 요약
 
@@ -16,6 +17,17 @@
 | 원자적 UPDATE (`count = count + 1`) | 정상 반영 | 최종 값 101 |
 | `SELECT ... FOR UPDATE` | 정상 반영, 두 번째 조회가 대기 후 최신 값을 읽음 | `data_locks`의 `X,REC_NOT_GAP` GRANTED / WAITING |
 | `SELECT ... FOR SHARE` | 데드락(1213), 희생 트랜잭션 전체 롤백 | `SHOW ENGINE INNODB STATUS`: 양쪽 S 보유, X 대기 |
+
+## 접근 순서 데드락 실험 요약
+
+두 세션이 같은 두 행(`news`, `search`)을 각각 한 트랜잭션에서 갱신할 때, 접근 순서에 따라 결과를 비교했습니다.
+
+| 방식 | 결과 | 근거 |
+|---|---|---|
+| 역순 접근 (`search→news` / `news→search`) | 데드락(1213), 희생 트랜잭션 롤백 | `SHOW ENGINE INNODB STATUS`: 서로 다른 행의 X 보유, 상대 행 X 대기 |
+| 정렬 순서 접근 (둘 다 `news→search`) | 데드락 없음, 한쪽이 대기 후 진행 | `data_lock_waits`: 대기 1건, 최종 값 news 52 / search 101 |
+
+정렬은 데드락을 단순 대기로 바꿀 뿐 대기를 없애지는 않으므로, 트랜잭션을 짧게 유지하는 것과 1213 재시도 로직이 함께 필요합니다.
 
 ## 재현 방법
 
