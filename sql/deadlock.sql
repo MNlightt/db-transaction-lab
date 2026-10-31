@@ -31,12 +31,12 @@ SELECT * FROM keyword_stats;
 BEGIN; UPDATE keyword_stats SET count = count + 1 WHERE keyword='news';
 -- 2 [S2] 대기 발생 (50초 안에 3~5 진행할 것)
 BEGIN; UPDATE keyword_stats SET count = count + 1 WHERE keyword='news';
--- 3 [S1] 
-UPDATE keyword_stats SET count = count + 1 WHERE keyword='search';
--- 4 [S1] 락 관찰
+-- 3 [S1] 락 관찰
 SELECT engine_transaction_id, lock_type, lock_mode, lock_status, lock_data
   FROM performance_schema.data_locks;
 SELECT * FROM performance_schema.data_lock_waits\G
+-- 4 [S1] 
+UPDATE keyword_stats SET count = count + 1 WHERE keyword='search';
 -- 5 [S1]
 COMMIT;
 -- 6 [S2] 대기 풀린 뒤
