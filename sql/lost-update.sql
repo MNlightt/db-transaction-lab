@@ -19,7 +19,7 @@ UPDATE keyword_stats SET count = 100 WHERE keyword='search';
 UPDATE keyword_stats SET count = 100 WHERE keyword='search';
 -- 5 [S1]
 COMMIT;
--- 5 [S2] 대기 풀린 뒤
+-- 6 [S2] 대기 풀린 뒤
 COMMIT;
 -- 확인: 기대 100 (Changed: 0)
 SELECT count FROM keyword_stats WHERE keyword='search';
@@ -33,11 +33,11 @@ BEGIN; SELECT count FROM keyword_stats WHERE keyword='search';
 UPDATE keyword_stats SET count = count + 1 WHERE keyword='search';
 -- 4 [S2] 대기 발생
 UPDATE keyword_stats SET count = count + 1 WHERE keyword='search';
--- 5 [S1]
+-- 5 [S1] COMMIT → S2 대기 풀림
 COMMIT;
 -- 6 [S2] 기대 101 (자기 트랜잭션 내에서 바꾼 내용)
 SELECT count FROM keyword_stats WHERE keyword='search';
--- 7 [S2] 대기 풀린 뒤
+-- 7 [S2] 
 COMMIT;
 -- 확인: 기대 101
 SELECT count FROM keyword_stats WHERE keyword='search';

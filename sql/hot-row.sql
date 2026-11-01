@@ -55,26 +55,3 @@ COMMIT;
 COMMIT;
 -- 확인: 기대 101
 SELECT SUM(count) FROM keyword_stats_shard WHERE keyword='search';
-
--- ===== MSSQL 실험 (MSSQL2022, REPEATABLE-READ) =====
--- ===== 초기화 (실험 G전 S1에서) =====
-CREATE DATABASE txlab;
-GO
-USE txlab;
-DROP TABLE IF EXISTS keyword_stats;
-CREATE TABLE keyword_stats (keyword VARCHAR(50) PRIMARY KEY, count INT NOT NULL);
-INSERT INTO keyword_stats VALUES ('search', 99);
-GO
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-SELECT @@SPID;
-GO
--- ===== 초기화 (실험 G전 S2에서) =====
-USE txlab;
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-SELECT @@SPID;
-GO
--- SPID 각각 73, 74 (실험마다 다름)
-
--- ===== 실험 G-1 : 앱에서 계산한 값으로 UPDATE =====
--- 1 [S1]
-BEGIN TRAN; SELECT count FROM keyword_stats WHERE keyword='search';

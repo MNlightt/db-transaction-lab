@@ -8,6 +8,9 @@
 | 접근 순서 데드락 재현과 해결 (MySQL 8.4 InnoDB, REPEATABLE READ) | [deadlock.md](deadlock.md) | [sql/deadlock.sql](sql/deadlock.sql) |
 | Hot row 대기와 샤딩 (MySQL 8.4 InnoDB, REPEATABLE READ) | [hot-row.md](hot-row.md) | [sql/hot-row.sql](sql/hot-row.sql) |
 | Lost update SQL Server 비교 (SQL Server 2022, REPEATABLE READ) | [mssql-lost-update.md](mssql-lost-update.md) | [sql/mssql-lost-update.sql](sql/mssql-lost-update.sql) |
+| 인덱스 유무와 락 범위 (MySQL 8.4 InnoDB, REPEATABLE READ) | [lock-range.md](lock-range.md) | [sql/lock-range.sql](sql/lock-range.sql) |
+| 격리수준과 이상현상 정리 (위 실험과 문서 근거) | [isolation-levels.md](isolation-levels.md) | - |
+| T-SQL Stored Procedure: 날짜별 순위 집계와 트랜잭션 롤백 (SQL Server 2022) | [stored-procedure.md](stored-procedure.md) | [sql/usp_build_keyword_rank.sql](sql/usp_build_keyword_rank.sql) |
 
 ## Lost update 실험 요약
 
@@ -52,6 +55,15 @@ Lost update 실험의 첫 번째 방식(앱에서 계산한 값으로 UPDATE)을
 | SQL Server | 데드락, 한쪽이 1205로 실패(재시도 가능) | `sys.dm_tran_locks` KEY: 세션 1 `S` GRANT + `X` CONVERT, 세션 2 `S` GRANT |
 
 차이의 원인은 REPEATABLE READ에서의 일반 SELECT입니다. SQL Server는 S 락을 커밋까지 유지하고, InnoDB는 락 없이 스냅샷을 읽습니다. 같은 1205라도 SQL Server에서는 데드락, MySQL에서는 락 대기 타임아웃을 뜻합니다.
+
+## 인덱스 유무와 락 범위 요약
+
+같은 데이터에서 `WHERE keyword='search'` UPDATE 한 건이 무엇을 잠그는지, `keyword` 인덱스 유무로 비교했습니다.
+
+| 조건 | 잠긴 것 (`data_locks`) | 다른 세션 |
+|---|---|---|
+| 인덱스 없음 | PRIMARY 모든 레코드 `X` + supremum | 다른 키워드 UPDATE, 모든 INSERT가 1205 |
+| `idx_keyword` 있음 | idx `X` 'search' + idx `X,GAP` 'stock' + PRIMARY `X,REC_NOT_GAP` | 다른 키워드 UPDATE 통과, INSERT는 (news, stock) 범위만 1205 |
 
 ## 재현 방법
 

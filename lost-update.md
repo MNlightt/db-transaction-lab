@@ -16,7 +16,7 @@ INSERT INTO keyword_stats VALUES ('search', 99);
 ## 시나리오
 
 동시 사용자가 있는 포탈에서 검색어를 집계. 키워드가 카운트가 100되면 hot keyword 선정됨과 동시에 앱을 통해 알림이 감.
-
+자기 UPDATE로 값이 100이 된 요청이 알림을 보낸다(= 읽은 값 + 1이 100)
 ---
 
 ## 실험 A — 앱에서 계산한 값으로 UPDATE
@@ -106,8 +106,9 @@ hot keyword 알림 1번, 최종 count는 101, 세션 2가 세션 1의 select for
   - 근거: `ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction`
 - 에러: 락 대기 타임아웃 에러(재시도하여 해결)
 - 근거: 세션 2의 조회 쿼리 재시도에서 count 100 반환(SELECT FOR UPDATE가 현재 커밋된 최신값을 읽음)
-  - 근거: `count - 100`, `1 row in set (5.60 sec)`
-- 예측과 비교: 일치 (최종 101, 세션 2 대기)
+  - 근거: `count: 100`, `1 row in set (5.60 sec)`
+- 예측과 비교: 부분 일치 (최종 101, 세션 2 대기)
+  -> 락 타임 아웃 에러 발생
 - 앱 관점 해석: SELECT FOR UPDATE를 통해 세션 2의 조회 쿼리가 대기하였으므로 알림 1번
 
 ### 고찰
@@ -156,7 +157,7 @@ REQUESTING_OBJECT_INSTANCE_BEGIN: 0
 
 REQUESTING_ENGINE_TRANSACTION_ID: 2398(세션 2), BLOCKING_ENGINE_TRANSACTION_ID: 2397(세션 1)
 
-- 세션 1이 세션 2의 조회 쿼리를 막고 있음.
+- 세션 1이 세션 2의 조회 쿼리를 막고 있음.(S2 재시도 상황)
 
 ---
 
@@ -182,7 +183,8 @@ REQUESTING_ENGINE_TRANSACTION_ID: 2398(세션 2), BLOCKING_ENGINE_TRANSACTION_ID
   - 근거: `Query OK, 1 row affected (2.02 sec)`, `ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction`
 - 에러: 데드락 에러
 - 근거: 데드락 이후에 세션 2에서 조회한 SELECT에서 count 100(세션 2의 트랜잭션이 롤백되었음을 의미)
-- 예측과 비교: 일치 (최종 100, 세션 2 데드락 희생)
+- 예측과 비교: 부분 일치 (최종 100, 세션 2 데드락 희생)
+  -> 희생자 선정 기준 불일치: 관찰상 사이클을 완성한 세션 2가 희생됨(선정 기준 미확인)
 - 앱 관점 해석: 세션 2의 UPDATE가 데드락으로 인해 실패하였으므로 에러 메세지 반환하고 알림 1번. 하지만 세션 2에서의 업데이트 요청이 사라짐
 
 ### 고찰
@@ -202,3 +204,15 @@ RECORD LOCKS space id 8 page no 4 n bits 72 index PRIMARY of table `txlab`.`keyw
 ```
 
 MySQL thread id 10은 세션 1(TRANSACTION 1), MySQL thread id 11은 세션 2(TRANSACTION 2)
+
+---
+## Lost update 해결 전후 요약 (A~D)
+
+| 실험 | 방식 | 최종 count | 알림 | 비고 |
+|---|---|---|---|---|
+| A | 앱 계산값 UPDATE | 100 (1회 소실) | 2번 | 조용한 lost update |
+| B | 원자적 UPDATE | 101 | 2번 (UPDATE 전 값으로 판단 시) | UPDATE 후 값으로 판단하면 1번(B 추가 실험) |
+| C | SELECT ... FOR UPDATE | 101 | 1번 | |
+| D | SELECT ... FOR SHARE | 100 | 1번 | 한쪽이 1213으로 실패, 재시도 필요 |
+
+낙관적 락(version 컬럼)도 대안이지만 이번에는 실험하지 않음.

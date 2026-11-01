@@ -44,4 +44,3 @@ UPDATE keyword_stats SET count = count + 1 WHERE keyword='search';
 COMMIT;
 -- 확인: 기대 news: 52, search: 101
 SELECT * FROM keyword_stats;
-

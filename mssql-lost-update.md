@@ -1,13 +1,13 @@
-# Lost update MSSQL 비교 실험 (SQL Server 2022)
+# Lost update SQL Server 비교 실험 (SQL Server 2022)
 
 ## 환경
 
 - DB: MSSQL2022 (Docker)
-- 격리수준: REPEATABLE-READ
+- 격리수준: REPEATABLE READ
 - 각 실험마다 아래 SQL로 초기화하였음
 
 ```sql
-CREATE DATABASE txlab;
+IF DB_ID('txlab') IS NULL CREATE DATABASE txlab;
 GO
 USE txlab;
 DROP TABLE IF EXISTS keyword_stats;
@@ -98,3 +98,4 @@ MySQL D·E에서는 사이클을 완성한 세션이, SQL Server G-1에서는 �
 
 RR에서 일반 SELECT가 SQL Server는 S 락을 커밋까지 유지하고, InnoDB는 락 없는 스냅샷 읽기다. 그래서 같은 '읽고 계산해서 쓰기'가 InnoDB에서는 조용한 lost update, SQL Server에서는 1205 데드락(한쪽 실패, 재시도 가능)으로 끝난다.
 에러 번호 주의: 같은 1205가 SQL Server에서는 데드락, MySQL에서는 락 대기 타임아웃이다. MySQL의 데드락은 1213.
+
